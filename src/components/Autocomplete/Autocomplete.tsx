@@ -1,19 +1,24 @@
 import React, {useMemo, useCallback} from 'react';
+import type {
+  ActionListItemDescriptor,
+  Descriptor,
+  OptionDescriptor,
+} from 'types';
 
-import type {ActionListItemDescriptor} from '../../types';
-import type {OptionDescriptor} from '../OptionList';
 import type {PopoverProps} from '../Popover';
+import {isSection} from '../../utilities/options';
 import {useI18n} from '../../utilities/i18n';
 import {ComboBox} from '../ComboBox';
 import {ListBox} from '../ListBox';
 
-import {MappedOption, MappedAction} from './components';
+import {MappedAction, MappedOption} from './components';
+import styles from './Autocomplete.scss';
 
 export interface AutocompleteProps {
   /** A unique identifier for the Autocomplete */
   id?: string;
   /** Collection of options to be listed */
-  options: OptionDescriptor[];
+  options: Descriptor[];
   /** The selected options */
   selected: string[];
   /** The text field component attached to the list of options */
@@ -63,16 +68,55 @@ export const Autocomplete: React.FunctionComponent<AutocompleteProps> & {
 
   const optionsMarkup = useMemo(() => {
     const conditionalOptions = loading && !willLoadMoreResults ? [] : options;
+
+    const buildMappedOptionFromOption = (option: OptionDescriptor) => {
+      return (
+        <MappedOption
+          {...option}
+          key={option.id || option.value}
+          selected={selected.includes(option.value)}
+          singleSelection={!allowMultiple}
+        />
+      );
+    };
+
+    if (isSection(conditionalOptions)) {
+      const noOptionsAvailable = conditionalOptions.every(
+        ({options}) => options.length === 0,
+      );
+
+      if (noOptionsAvailable) {
+        return null;
+      }
+
+      const optionsMarkup = conditionalOptions.map(({options, title}) => {
+        if (options.length === 0) {
+          return null;
+        }
+
+        const optionMarkup = options.map((opt) =>
+          buildMappedOptionFromOption(opt),
+        );
+
+        return (
+          <ListBox.Section
+            divider={false}
+            title={<ListBox.Header>{title}</ListBox.Header>}
+            key={title}
+          >
+            {optionMarkup}
+          </ListBox.Section>
+        );
+      });
+
+      return <div className={styles.SectionWrapper}>{optionsMarkup}</div>;
+    }
+
     const optionList =
       conditionalOptions.length > 0
-        ? conditionalOptions.map((option) => (
-            <MappedOption
-              {...option}
-              key={option.id || option.value}
-              selected={selected.includes(option.value)}
-              singleSelection={!allowMultiple}
-            />
-          ))
+        ? (conditionalOptions as OptionDescriptor[]).map((option) =>
+            buildMappedOptionFromOption(option),
+          )
         : null;
 
     if (listTitle) {
